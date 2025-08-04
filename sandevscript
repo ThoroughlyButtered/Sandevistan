@@ -1,44 +1,74 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
 local DEFAULT_SPEED = 16
-local BOOSTED_SPEED = 32
-local BOOST_DURATION = 10
+local isBoostActive = false
+local persistentAfterimages = false
 
 local gui = Instance.new("ScreenGui")
 gui.ResetOnSpawn = false
 gui.Name = "SpeedBoostGui"
 gui.Parent = player:WaitForChild("PlayerGui")
 
+-- Activate/Deactivate button
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 150, 0, 50)
 button.AnchorPoint = Vector2.new(0.5, 0.5)
-button.Position = UDim2.new(0.5, 0, 0.95, 0)
+button.Position = UDim2.new(0.4, 0, 0.95, 0)
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 button.TextColor3 = Color3.new(1, 1, 1)
 button.Font = Enum.Font.SourceSansBold
 button.TextSize = 24
 button.Text = "Activate"
+button.ZIndex = 10
 button.Parent = gui
 
--- Softer neon-ish colors (Color3 values)
-local colors = {
-	Color3.fromRGB(255, 85, 85),    -- softer red
-	Color3.fromRGB(255, 195, 0),    -- warm yellow
-	Color3.fromRGB(120, 120, 120),  -- medium gray
-	Color3.fromRGB(85, 255, 85),    -- soft green
-	Color3.fromRGB(85, 170, 255),   -- soft blue
-	Color3.fromRGB(170, 85, 255),   -- soft purple
-	Color3.fromRGB(255, 100, 180),  -- soft pink
-}
+-- Persistent toggle
+local togglePersistentBtn = Instance.new("TextButton")
+togglePersistentBtn.Size = UDim2.new(0, 120, 0, 35)
+togglePersistentBtn.AnchorPoint = Vector2.new(0, 0.5)
+togglePersistentBtn.Position = UDim2.new(0.53, 10, 0.95, 0)
+togglePersistentBtn.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+togglePersistentBtn.TextColor3 = Color3.new(1, 1, 1)
+togglePersistentBtn.Font = Enum.Font.SourceSans
+togglePersistentBtn.TextSize = 18
+togglePersistentBtn.Text = "Persistent: OFF"
+togglePersistentBtn.ZIndex = 10
+togglePersistentBtn.Parent = gui
 
+-- Speed input textbox
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(0, 80, 0, 35)
+speedInput.AnchorPoint = Vector2.new(0, 0.5)
+speedInput.Position = UDim2.new(0.72, 10, 0.95, 0)
+speedInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+speedInput.TextColor3 = Color3.new(1, 1, 1)
+speedInput.Font = Enum.Font.SourceSans
+speedInput.TextSize = 20
+speedInput.PlaceholderText = "Speed"
+speedInput.Text = "50"
+speedInput.ClearTextOnFocus = false
+speedInput.ZIndex = 10
+speedInput.Parent = gui
+
+-- Afterimage color cycling
+local colors = {
+	Color3.fromRGB(255, 85, 85),
+	Color3.fromRGB(255, 195, 0),
+	Color3.fromRGB(120, 120, 120),
+	Color3.fromRGB(85, 255, 85),
+	Color3.fromRGB(85, 170, 255),
+	Color3.fromRGB(170, 85, 255),
+	Color3.fromRGB(255, 100, 180),
+}
 local colorIndex = 1
+
+local activeClones = {}
 
 local function createBlock(size, cframe, color)
 	local part = Instance.new("Part")
@@ -49,63 +79,58 @@ local function createBlock(size, cframe, color)
 	part.Transparency = 0.5
 	part.Color = color
 	part.Material = Enum.Material.Neon
+	part.Name = "SandevistanClone"
+	part.Parent = workspace
+	table.insert(activeClones, part)
 	return part
 end
 
 local trailConnection
 local lastSpawnTime = 0
-local spawnInterval = 0.01 -- super frequent spawning
 
 local function createBlockyAfterimage()
 	if not character or not character.Parent then return end
 
-	local hrp = character:FindFirstChild("HumanoidRootPart")
-	local head = character:FindFirstChild("Head")
-	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
-	local leftArm = character:FindFirstChild("Left Arm") or character:FindFirstChild("LeftUpperArm")
-	local rightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightUpperArm")
-	local leftLeg = character:FindFirstChild("Left Leg") or character:FindFirstChild("LeftUpperLeg")
-	local rightLeg = character:FindFirstChild("Right Leg") or character:FindFirstChild("RightUpperLeg")
-
-	if not hrp or not head or not torso then return end
-
 	local parts = {}
 
-	local currentColor = colors[colorIndex]
-	colorIndex = colorIndex + 1
-	if colorIndex > #colors then
-		colorIndex = 1
+	local function tryAdd(name, size)
+		local part = character:FindFirstChild(name)
+		if part then
+			table.insert(parts, createBlock(size, part.CFrame, colors[colorIndex]))
+		end
 	end
 
-	if head then
-		table.insert(parts, createBlock(Vector3.new(2, 1, 1), head.CFrame, currentColor))
-	end
-	if torso then
-		table.insert(parts, createBlock(Vector3.new(2, 2, 1), torso.CFrame, currentColor))
-	end
-	if leftArm then
-		table.insert(parts, createBlock(Vector3.new(1, 2, 1), leftArm.CFrame, currentColor))
-	end
-	if rightArm then
-		table.insert(parts, createBlock(Vector3.new(1, 2, 1), rightArm.CFrame, currentColor))
-	end
-	if leftLeg then
-		table.insert(parts, createBlock(Vector3.new(1, 2, 1), leftLeg.CFrame, currentColor))
-	end
-	if rightLeg then
-		table.insert(parts, createBlock(Vector3.new(1, 2, 1), rightLeg.CFrame, currentColor))
-	end
+	colorIndex = (colorIndex % #colors) + 1
 
-	for _, part in ipairs(parts) do
-		part.Parent = workspace
-		TweenService:Create(part, TweenInfo.new(0.5), {Transparency = 1}):Play()
-		Debris:AddItem(part, 0.6)
+	tryAdd("Head", Vector3.new(2, 1, 1))
+	tryAdd("Torso", Vector3.new(2, 2, 1))
+	tryAdd("UpperTorso", Vector3.new(2, 2, 1))
+	tryAdd("Left Arm", Vector3.new(1, 2, 1))
+	tryAdd("LeftUpperArm", Vector3.new(1, 2, 1))
+	tryAdd("Right Arm", Vector3.new(1, 2, 1))
+	tryAdd("RightUpperArm", Vector3.new(1, 2, 1))
+	tryAdd("Left Leg", Vector3.new(1, 2, 1))
+	tryAdd("LeftUpperLeg", Vector3.new(1, 2, 1))
+	tryAdd("Right Leg", Vector3.new(1, 2, 1))
+	tryAdd("RightUpperLeg", Vector3.new(1, 2, 1))
+
+	if not persistentAfterimages then
+		for _, part in ipairs(parts) do
+			TweenService:Create(part, TweenInfo.new(1.5), {Transparency = 1}):Play()
+			task.delay(1.5, function()
+				if part and part.Parent then
+					part:Destroy()
+				end
+			end)
+		end
 	end
 end
 
 local function startTrail()
 	trailConnection = RunService.Heartbeat:Connect(function()
-		if tick() - lastSpawnTime >= spawnInterval then
+		local currentSpeed = math.max(humanoid.WalkSpeed, 1)
+		local currentInterval = 0.07 * (50 / currentSpeed)
+		if tick() - lastSpawnTime >= currentInterval then
 			createBlockyAfterimage()
 			lastSpawnTime = tick()
 		end
@@ -119,21 +144,42 @@ local function stopTrail()
 	end
 end
 
-local function activateBoost()
-	humanoid.WalkSpeed = BOOSTED_SPEED
-	button.Visible = false
-	startTrail()
-
-	task.delay(BOOST_DURATION, function()
-		humanoid.WalkSpeed = DEFAULT_SPEED
-		stopTrail()
-		button.Visible = true
-	end)
+local function clearClones()
+	for _, part in ipairs(activeClones) do
+		if part and part.Parent then
+			part:Destroy()
+		end
+	end
+	table.clear(activeClones)
 end
+
+local function toggleBoost()
+	isBoostActive = not isBoostActive
+
+	if isBoostActive then
+		local desiredSpeed = tonumber(speedInput.Text)
+		if not desiredSpeed or desiredSpeed <= 0 then
+			desiredSpeed = 50
+		end
+		humanoid.WalkSpeed = desiredSpeed
+		button.Text = "Deactivate"
+		startTrail()
+	else
+		humanoid.WalkSpeed = DEFAULT_SPEED
+		button.Text = "Activate"
+		stopTrail()
+		clearClones()
+	end
+end
+
+togglePersistentBtn.MouseButton1Click:Connect(function()
+	persistentAfterimages = not persistentAfterimages
+	togglePersistentBtn.Text = persistentAfterimages and "Persistent: ON" or "Persistent: OFF"
+end)
 
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
 	humanoid = character:WaitForChild("Humanoid")
 end)
 
-button.MouseButton1Click:Connect(activateBoost)
+button.MouseButton1Click:Connect(toggleBoost)
