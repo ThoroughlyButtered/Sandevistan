@@ -6,18 +6,29 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
-local Camera = workspace.CurrentCamera
 
 local DEFAULT_SPEED = 16
 local isBoostActive = false
 local persistentAfterimages = false
-local shiftLockEnabled = false
 
 -- GUI Setup
 local gui = Instance.new("ScreenGui")
 gui.ResetOnSpawn = false
 gui.Name = "SpeedBoostGui"
 gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Creator label
+local creatorLabel = Instance.new("TextLabel")
+creatorLabel.Size = UDim2.new(1, 0, 0, 30)
+creatorLabel.Position = UDim2.new(0, 0, 0, 0)
+creatorLabel.BackgroundTransparency = 1
+creatorLabel.TextColor3 = Color3.new(1, 1, 1)
+creatorLabel.Font = Enum.Font.SourceSansBold
+creatorLabel.TextSize = 18
+creatorLabel.Text = "Created by: @thoroughlybuttered on youtube"
+creatorLabel.TextStrokeTransparency = 0.5
+creatorLabel.TextXAlignment = Enum.TextXAlignment.Center
+creatorLabel.Parent = gui
 
 -- Activate button
 local button = Instance.new("TextButton")
@@ -180,26 +191,6 @@ local function toggleBoost()
 	end
 end
 
--- Shift Lock Toggle with "\"
-local function toggleShiftLock()
-	shiftLockEnabled = not shiftLockEnabled
-
-	if shiftLockEnabled then
-		player.CameraMode = Enum.CameraMode.LockFirstPerson
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-	else
-		player.CameraMode = Enum.CameraMode.Classic
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-	end
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.BackSlash then
-		toggleShiftLock()
-	end
-end)
-
 -- Persistent toggle
 togglePersistentBtn.MouseButton1Click:Connect(function()
 	persistentAfterimages = not persistentAfterimages
@@ -214,3 +205,11 @@ end)
 
 -- Button activation
 button.MouseButton1Click:Connect(toggleBoost)
+
+-- Key press toggle (B key)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.B then
+		toggleBoost()
+	end
+end)
