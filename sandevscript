@@ -1,21 +1,25 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
+local Camera = workspace.CurrentCamera
 
 local DEFAULT_SPEED = 16
 local isBoostActive = false
 local persistentAfterimages = false
+local shiftLockEnabled = false
 
+-- GUI Setup
 local gui = Instance.new("ScreenGui")
 gui.ResetOnSpawn = false
 gui.Name = "SpeedBoostGui"
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- Activate/Deactivate button
+-- Activate button
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 150, 0, 50)
 button.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -41,7 +45,7 @@ togglePersistentBtn.Text = "Persistent: OFF"
 togglePersistentBtn.ZIndex = 10
 togglePersistentBtn.Parent = gui
 
--- Speed input textbox
+-- Speed input
 local speedInput = Instance.new("TextBox")
 speedInput.Size = UDim2.new(0, 80, 0, 35)
 speedInput.AnchorPoint = Vector2.new(0, 0.5)
@@ -56,7 +60,7 @@ speedInput.ClearTextOnFocus = false
 speedInput.ZIndex = 10
 speedInput.Parent = gui
 
--- Afterimage color cycling
+-- Afterimage colors
 local colors = {
 	Color3.fromRGB(255, 85, 85),
 	Color3.fromRGB(255, 195, 0),
@@ -67,9 +71,9 @@ local colors = {
 	Color3.fromRGB(255, 100, 180),
 }
 local colorIndex = 1
-
 local activeClones = {}
 
+-- Create visual afterimage part
 local function createBlock(size, cframe, color)
 	local part = Instance.new("Part")
 	part.Size = size
@@ -85,6 +89,7 @@ local function createBlock(size, cframe, color)
 	return part
 end
 
+-- Spawn afterimages
 local trailConnection
 local lastSpawnTime = 0
 
@@ -126,6 +131,7 @@ local function createBlockyAfterimage()
 	end
 end
 
+-- Start/stop trails
 local function startTrail()
 	trailConnection = RunService.Heartbeat:Connect(function()
 		local currentSpeed = math.max(humanoid.WalkSpeed, 1)
@@ -144,6 +150,7 @@ local function stopTrail()
 	end
 end
 
+-- Clean up
 local function clearClones()
 	for _, part in ipairs(activeClones) do
 		if part and part.Parent then
@@ -153,6 +160,7 @@ local function clearClones()
 	table.clear(activeClones)
 end
 
+-- Toggle speed boost
 local function toggleBoost()
 	isBoostActive = not isBoostActive
 
@@ -172,14 +180,37 @@ local function toggleBoost()
 	end
 end
 
+-- Shift Lock Toggle with "\"
+local function toggleShiftLock()
+	shiftLockEnabled = not shiftLockEnabled
+
+	if shiftLockEnabled then
+		player.CameraMode = Enum.CameraMode.LockFirstPerson
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	else
+		player.CameraMode = Enum.CameraMode.Classic
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.BackSlash then
+		toggleShiftLock()
+	end
+end)
+
+-- Persistent toggle
 togglePersistentBtn.MouseButton1Click:Connect(function()
 	persistentAfterimages = not persistentAfterimages
 	togglePersistentBtn.Text = persistentAfterimages and "Persistent: ON" or "Persistent: OFF"
 end)
 
+-- Character respawn support
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
 	humanoid = character:WaitForChild("Humanoid")
 end)
 
+-- Button activation
 button.MouseButton1Click:Connect(toggleBoost)
