@@ -1,0 +1,138 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local DEFAULT_SPEED = 16
+local BOOSTED_SPEED = 32
+local BOOST_DURATION = 10
+
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Name = "SpeedBoostGui"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 150, 0, 50)
+button.Position = UDim2.new(0.5, -75, 0.9, -25)
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.SourceSansBold
+button.TextSize = 24
+button.Text = "Activate"
+button.Parent = gui
+
+-- Softer neon-ish colors (Color3 values)
+local colors = {
+	Color3.fromRGB(255, 85, 85),    -- softer red
+	Color3.fromRGB(255, 195, 0),    -- warm yellow
+	Color3.fromRGB(120, 120, 120),  -- medium gray
+	Color3.fromRGB(85, 255, 85),    -- soft green
+	Color3.fromRGB(85, 170, 255),   -- soft blue
+	Color3.fromRGB(170, 85, 255),   -- soft purple
+	Color3.fromRGB(255, 100, 180),  -- soft pink
+}
+
+local colorIndex = 1
+
+local function createBlock(size, cframe, color)
+	local part = Instance.new("Part")
+	part.Size = size
+	part.CFrame = cframe
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 0.5
+	part.Color = color
+	part.Material = Enum.Material.Neon
+	return part
+end
+
+local trailConnection
+local lastSpawnTime = 0
+local spawnInterval = 0.01 -- super frequent spawning
+
+local function createBlockyAfterimage()
+	if not character or not character.Parent then return end
+
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	local head = character:FindFirstChild("Head")
+	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+	local leftArm = character:FindFirstChild("Left Arm") or character:FindFirstChild("LeftUpperArm")
+	local rightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightUpperArm")
+	local leftLeg = character:FindFirstChild("Left Leg") or character:FindFirstChild("LeftUpperLeg")
+	local rightLeg = character:FindFirstChild("Right Leg") or character:FindFirstChild("RightUpperLeg")
+
+	if not hrp or not head or not torso then return end
+
+	local parts = {}
+
+	local currentColor = colors[colorIndex]
+	colorIndex = colorIndex + 1
+	if colorIndex > #colors then
+		colorIndex = 1
+	end
+
+	if head then
+		table.insert(parts, createBlock(Vector3.new(2, 1, 1), head.CFrame, currentColor))
+	end
+	if torso then
+		table.insert(parts, createBlock(Vector3.new(2, 2, 1), torso.CFrame, currentColor))
+	end
+	if leftArm then
+		table.insert(parts, createBlock(Vector3.new(1, 2, 1), leftArm.CFrame, currentColor))
+	end
+	if rightArm then
+		table.insert(parts, createBlock(Vector3.new(1, 2, 1), rightArm.CFrame, currentColor))
+	end
+	if leftLeg then
+		table.insert(parts, createBlock(Vector3.new(1, 2, 1), leftLeg.CFrame, currentColor))
+	end
+	if rightLeg then
+		table.insert(parts, createBlock(Vector3.new(1, 2, 1), rightLeg.CFrame, currentColor))
+	end
+
+	for _, part in ipairs(parts) do
+		part.Parent = workspace
+		TweenService:Create(part, TweenInfo.new(0.5), {Transparency = 1}):Play()
+		Debris:AddItem(part, 0.6)
+	end
+end
+
+local function startTrail()
+	trailConnection = RunService.Heartbeat:Connect(function()
+		if tick() - lastSpawnTime >= spawnInterval then
+			createBlockyAfterimage()
+			lastSpawnTime = tick()
+		end
+	end)
+end
+
+local function stopTrail()
+	if trailConnection then
+		trailConnection:Disconnect()
+		trailConnection = nil
+	end
+end
+
+local function activateBoost()
+	humanoid.WalkSpeed = BOOSTED_SPEED
+	button.Visible = false
+	startTrail()
+
+	task.delay(BOOST_DURATION, function()
+		humanoid.WalkSpeed = DEFAULT_SPEED
+		stopTrail()
+		button.Visible = true
+	end)
+end
+
+player.CharacterAdded:Connect(function(newChar)
+	character = newChar
+	humanoid = character:WaitForChild("Humanoid")
+end)
+
+button.MouseButton1Click:Connect(activateBoost)
