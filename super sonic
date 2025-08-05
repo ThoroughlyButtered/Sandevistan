@@ -315,10 +315,10 @@ local function summonEmeralds()
 
 			task.delay(0.6, function()
 				emeralds = {}
-				flashScreen()
-				toggleSuperSonic(true)
-				floatPlayer(1, 0)
-				transforming = false
+					flashScreen()
+					toggleSuperSonic(true)
+					floatPlayer(1, 0)
+					transforming = false
 			end)
 		end
 	end)
