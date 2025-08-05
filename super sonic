@@ -13,6 +13,20 @@ local speedBoost = 500
 local normalSpeed = 16
 local emeralds = {}
 local trail = nil -- Trail variable
+local modelHighlight = nil -- whole model highlight variable
+
+-- Animation IDs
+local transformedIdleAnimationId = "rbxassetid://99997181191466"
+local transformedRunAnimationId = "rbxassetid://102072284279994"
+
+-- Animation objects and tracks
+local transformedIdleAnim = Instance.new("Animation")
+transformedIdleAnim.AnimationId = transformedIdleAnimationId
+local transformedIdleTrack = nil
+
+local transformedRunAnim = Instance.new("Animation")
+transformedRunAnim.AnimationId = transformedRunAnimationId
+local transformedRunTrack = nil
 
 local emeraldColors = {
 	Color3.fromRGB(255, 0, 0),     -- Red
@@ -126,16 +140,90 @@ local function removeTrail()
 	end
 end
 
+local function createModelHighlight()
+	if modelHighlight then return end
+	modelHighlight = Instance.new("Highlight")
+	modelHighlight.Adornee = character
+	modelHighlight.FillColor = Color3.fromRGB(255, 255, 0) -- yellow
+	modelHighlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+	modelHighlight.FillTransparency = 0.7
+	modelHighlight.OutlineTransparency = 0.7
+	modelHighlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	modelHighlight.Parent = character
+end
+
+local function removeModelHighlight()
+	if modelHighlight then
+		modelHighlight:Destroy()
+		modelHighlight = nil
+	end
+end
+
+local function playTransformedIdle()
+	if transformedIdleTrack then return end
+	transformedIdleTrack = humanoid:LoadAnimation(transformedIdleAnim)
+	transformedIdleTrack.Priority = Enum.AnimationPriority.Idle
+	transformedIdleTrack:Play()
+end
+
+local function stopTransformedIdle()
+	if transformedIdleTrack then
+		transformedIdleTrack:Stop()
+		transformedIdleTrack = nil
+	end
+end
+
+local function playTransformedRun()
+	if transformedRunTrack then return end
+	transformedRunTrack = humanoid:LoadAnimation(transformedRunAnim)
+	transformedRunTrack.Priority = Enum.AnimationPriority.Movement
+	transformedRunTrack:Play()
+end
+
+local function stopTransformedRun()
+	if transformedRunTrack then
+		transformedRunTrack:Stop()
+		transformedRunTrack = nil
+	end
+end
+
+local function updateAnimation()
+	if not superSonic then return end
+
+	-- If player is moving (velocity magnitude > 1), play run animation; else idle
+	local velocity = rootPart.Velocity
+	local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+
+	if horizontalSpeed > 1 then
+		if not transformedRunTrack then
+			stopTransformedIdle()
+			playTransformedRun()
+		end
+	else
+		if not transformedIdleTrack then
+			stopTransformedRun()
+			playTransformedIdle()
+		end
+	end
+end
+
 local function toggleSuperSonic(state)
 	superSonic = state
 	if superSonic then
 		humanoid.WalkSpeed = speedBoost
 		highlightAccessories()
 		createTrail()
+		createModelHighlight()
+		playTransformedIdle()
+		runService:BindToRenderStep("SuperSonicAnimationUpdate", Enum.RenderPriority.Character.Value, updateAnimation)
 	else
 		humanoid.WalkSpeed = normalSpeed
 		clearHighlights()
 		removeTrail()
+		removeModelHighlight()
+		stopTransformedIdle()
+		stopTransformedRun()
+		runService:UnbindFromRenderStep("SuperSonicAnimationUpdate")
 	end
 end
 
@@ -175,7 +263,7 @@ local function summonEmeralds()
 			part.Color = emeraldColors[i]
 			part.Anchored = true
 			part.CanCollide = false
-			part.Material = Enum.Material.Neon  -- <== Neon now
+			part.Material = Enum.Material.Neon
 			part.Transparency = 0
 			part.Parent = workspace
 
@@ -256,4 +344,8 @@ player.CharacterAdded:Connect(function(newChar)
 	superSonic = false
 	humanoid.WalkSpeed = normalSpeed
 	removeTrail()
+	removeModelHighlight()
+	stopTransformedIdle()
+	stopTransformedRun()
+	runService:UnbindFromRenderStep("SuperSonicAnimationUpdate")
 end)
